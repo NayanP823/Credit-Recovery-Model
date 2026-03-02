@@ -34,29 +34,34 @@ class CustomerData(BaseModel):
     PAY_AMT5: float
     PAY_AMT6: float
 
+
 @app.post("/assess_risk")
 def assess_risk(data: CustomerData):
-    # Convert input to DataFrame (to match model training input names)
     input_data = pd.DataFrame([data.model_dump()])
-    
-    # Predict probability of default (class 1)
+
     try:
         prob = model.predict_proba(input_data)[0][1]
         risk_score = round(prob * 100, 2)
-        
-        # Determine action
-        if risk_score > 60:
+
+        # 🔥 Rule-based override (NEW LOGIC ADDED)
+        if data.BILL_AMT1 > data.LIMIT_BAL * 5:
+            risk_score = 95.0  # force high risk score
             action = "Legal notice"
-        elif risk_score > 30:
-            action = "Phone call"
         else:
-            action = "SMS reminder"
-            
+            # Original logic
+            if risk_score > 60:
+                action = "Legal notice"
+            elif risk_score > 30:
+                action = "Phone call"
+            else:
+                action = "SMS reminder"
+
         return {
             "probability": round(prob, 4),
             "risk_score": risk_score,
             "suggested_recovery_action": action
         }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
